@@ -96,46 +96,135 @@ class Grid {
         this.endCell = null;
     }
 
+    getManhattanDistance(row1, col1, row2, col2) {
+        return Math.abs(row1 - row2) + Math.abs(col1 - col2);
+    }
+
+
     findPath() {
         if (!this.startCell || !this.endCell) {
             alert('Please set both start and end points');
             return;
         }
         
-        // Get coordinates from the data-pos attribute
         const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
         const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
         
         console.log('Finding path from', [startRow, startCol], 'to', [endRow, endCol]);
-        // You can implement the A* algorithm here
 
-        pq = new PriorityQueue() 
-        pq.enqueue([startRow, startCol], 0)
+        const pq = new PriorityQueue();
+        const visited = new Set();
+        // Calculate initial h(x) value using Manhattan distance
+        const initialH = this.getManhattanDistance(startRow, startCol, endRow, endCol);
+        // f(x) = g(x) + h(x) = 0 + h(x) for start node
+        pq.enqueue([startRow, startCol], initialH);
+    
 
         let distances = {}
-
+        // Initialize all distances to Infinity
         for (let row = 0; row < this.height; row++) {
             for (let col = 0; col < this.width; col++) {
-                distances[`${row},${col}`] = Infinity
+                distances[`${row},${col}`] = Infinity;
             }
         }
-
-        distances[`${startRow},${startCol}`] = 0
-        let previous = {}
-        previous[`${startRow},${startCol}`] = null
+        // Set start distance to 0
+        distances[`${startRow},${startCol}`] = 0;
+        
+        let previous = {};
+        previous[`${startRow},${startCol}`] = null;
 
         while(pq.values.length) {
-            current = pq.dequeue().value
+            current = pq.dequeue().value;
+            const [currentRow, currentCol] = current;
+
+            visited.add(`${currentRow},${currentCol}`);
+            if (currentRow === endRow && currentCol === endCol) {
+                console.log('Path found!');
+                break;
+            }
+
+            const neighbors = this.getNeighbors(currentRow, currentCol);
+            for (const neighbor of neighbors) {
+                const [neighborRow, neighborCol] = neighbor;
+                if (visited.has(`${neighborRow},${neighborCol}`)) continue;
             
+            }
+
         }
+    }
 
-
+    generateRandomMaze() {
+        // Clear the grid first
+        this.clearGrid();
         
-
-
-       
+        // Set random start point on left edge
+        const startRow = Math.floor(Math.random() * this.height);
+        this.startCell = this.grid[startRow][0];
+        this.startCell.className = 'cell start';
         
+        // Set random end point on right edge
+        const endRow = Math.floor(Math.random() * this.height);
+        this.endCell = this.grid[endRow][this.width - 1];
+        this.endCell.className = 'cell end';
+        
+        // Initialize all cells as walls
+        for (let row = 0; row < this.height; row++) {
+            for (let col = 0; col < this.width; col++) {
+                if (this.grid[row][col] !== this.startCell && 
+                    this.grid[row][col] !== this.endCell) {
+                    this.grid[row][col].classList.add('wall');
+                }
+            }
+        }
+        
+        // Start DFS from the start cell
+        this.dfsMazeGeneration(startRow, 0);
+    }
 
+    dfsMazeGeneration(row, col) {
+        // Mark current cell as path (remove wall)
+        if (this.grid[row][col] !== this.startCell && 
+            this.grid[row][col] !== this.endCell) {
+            this.grid[row][col].classList.remove('wall');
+        }
+        
+        // Get neighbors in random order
+        const directions = [
+            [0, 2],  // right
+            [2, 0],  // down
+            [0, -2], // left
+            [-2, 0]  // up
+        ];
+        this.shuffleArray(directions);
+        
+        // Try each direction
+        for (const [dx, dy] of directions) {
+            const newRow = row + dx;
+            const newCol = col + dy;
+            
+            // Check if new position is within bounds and is a wall
+            if (newRow >= 0 && newRow < this.height && 
+                newCol >= 0 && newCol < this.width && 
+                this.grid[newRow][newCol].classList.contains('wall')) {
+                
+                // Carve through the wall between current cell and new cell
+                const wallRow = row + dx/2;
+                const wallCol = col + dy/2;
+                this.grid[wallRow][wallCol].classList.remove('wall');
+                
+                // Continue DFS from new cell
+                this.dfsMazeGeneration(newRow, newCol);
+            }
+        }
+    }
+
+    // Helper function to shuffle array
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
 }
 
@@ -227,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const clearButton = document.getElementById('clearGrid');
         const findPathButton = document.getElementById('findPath');
+        const randomizeButton = document.getElementById('randomize');
         
         clearButton.addEventListener('click', () => {
             requestAnimationFrame(() => gridInstance.clearGrid());
@@ -234,6 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         findPathButton.addEventListener('click', () => {
             requestAnimationFrame(() => gridInstance.findPath());
+        });
+
+        randomizeButton.addEventListener('click', () => {
+            requestAnimationFrame(() => gridInstance.generateRandomMaze());
         });
     });
 }); 

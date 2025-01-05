@@ -60,6 +60,25 @@ body {
     background-color: #686de0;
 }
 
+#randomize {
+    position: fixed;
+    top: 20px;
+    left: 260px;
+    padding: 10px 20px;
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+    z-index: 1000;
+}
+
+#randomize:hover {
+    background-color: #27ae60;
+}
+
 #grid {
     display: grid;
     grid-template-columns: repeat(20, 30px);
