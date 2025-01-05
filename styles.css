@@ -116,6 +116,11 @@ body {
     background-color: #e17055;
 }
 
+.cell.exploring {
+    background-color: #ffa502;
+    transition: background-color 0.1s ease-in-out;
+}
+
 .mode-selector {
     margin-top: 10px;
     display: flex;

@@ -100,12 +100,15 @@ class Grid {
         return Math.abs(row1 - row2) + Math.abs(col1 - col2);
     }
 
-
-    findPath() {
+    async findPath() {
         if (!this.startCell || !this.endCell) {
             alert('Please set both start and end points');
             return;
         }
+        
+        // Clear any previous exploration visualization
+        const cells = this.gridElement.getElementsByClassName('exploring');
+        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
         
         const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
         const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
@@ -114,43 +117,62 @@ class Grid {
 
         const pq = new PriorityQueue();
         const visited = new Set();
-        // Calculate initial h(x) value using Manhattan distance
-        const initialH = this.getManhattanDistance(startRow, startCol, endRow, endCol);
-        // f(x) = g(x) + h(x) = 0 + h(x) for start node
-        pq.enqueue([startRow, startCol], initialH);
-    
+        const f_score = {};
+        const g_score = {};
 
-        let distances = {}
         // Initialize all distances to Infinity
         for (let row = 0; row < this.height; row++) {
             for (let col = 0; col < this.width; col++) {
-                distances[`${row},${col}`] = Infinity;
+                f_score[`${row},${col}`] = Infinity;
+                g_score[`${row},${col}`] = Infinity;
             }
         }
-        // Set start distance to 0
-        distances[`${startRow},${startCol}`] = 0;
-        
-        let previous = {};
-        previous[`${startRow},${startCol}`] = null;
+
+        g_score[`${startRow},${startCol}`] = 0;
+        f_score[`${startRow},${startCol}`] = g_score[`${startRow},${startCol}`] + 
+            this.getManhattanDistance(startRow, startCol, endRow, endCol);
+
+        const came_from = {};
+        came_from[`${startRow},${startCol}`] = null;
+
+        pq.enqueue([startRow, startCol], f_score[`${startRow},${startCol}`]);
 
         while(pq.values.length) {
-            current = pq.dequeue().value;
+            const { element: current } = pq.dequeue();
             const [currentRow, currentCol] = current;
+
+            // Visualize current cell being explored
+            if (this.grid[currentRow][currentCol] !== this.startCell && 
+                this.grid[currentRow][currentCol] !== this.endCell) {
+                this.grid[currentRow][currentCol].classList.add('exploring');
+                // Add small delay to see the exploration
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
 
             visited.add(`${currentRow},${currentCol}`);
             if (currentRow === endRow && currentCol === endCol) {
                 console.log('Path found!');
-                break;
+                const path = this.reconstructPath(came_from, [endRow, endCol]);
+                return path;
             }
 
             const neighbors = this.getNeighbors(currentRow, currentCol);
             for (const neighbor of neighbors) {
                 const [neighborRow, neighborCol] = neighbor;
                 if (visited.has(`${neighborRow},${neighborCol}`)) continue;
-            
-            }
 
+                const tentative_g_score = g_score[`${currentRow},${currentCol}`] + 1;
+
+                if (tentative_g_score < g_score[`${neighborRow},${neighborCol}`]) {
+                    came_from[`${neighborRow},${neighborCol}`] = current;
+                    g_score[`${neighborRow},${neighborCol}`] = tentative_g_score;
+                    f_score[`${neighborRow},${neighborCol}`] = g_score[`${neighborRow},${neighborCol}`] + 
+                        this.getManhattanDistance(neighborRow, neighborCol, endRow, endCol);
+                    pq.enqueue([neighborRow, neighborCol], f_score[`${neighborRow},${neighborCol}`]);
+                }
+            }
         }
+        return null;
     }
 
     generateRandomMaze() {
@@ -225,6 +247,41 @@ class Grid {
             [array[i], array[j]] = [array[j], array[i]];
         }
         return array;
+    }
+
+    // Add this method to get valid neighbors
+    getNeighbors(row, col) {
+        // Define the four possible directions a cell can move
+        const directions = [
+            [-1, 0],  // up    (decrease row by 1)
+            [1, 0],   // down  (increase row by 1)
+            [0, -1],  // left  (decrease column by 1)
+            [0, 1]    // right (increase column by 1)
+        ];
+        
+        return directions
+            // Step 1: Map each direction to new coordinates
+            .map(([dx, dy]) => [row + dx, col + dy])
+            // Step 2: Filter out invalid moves
+            .filter(([newRow, newCol]) => 
+                // Check if within grid bounds
+                newRow >= 0 && newRow < this.height &&
+                newCol >= 0 && newCol < this.width &&
+                // Check if not a wall
+                !this.grid[newRow][newCol].classList.contains('wall')
+            );
+    }
+
+    reconstructPath(came_from, end) {
+        let current = end;
+        const path = [];
+        
+        while (current !== null) {
+            path.push(current);
+            current = came_from[`${current[0]},${current[1]}`];
+        }
+        path.reverse()
+        return path
     }
 }
 
@@ -323,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         findPathButton.addEventListener('click', () => {
-            requestAnimationFrame(() => gridInstance.findPath());
+            requestAnimationFrame(async () => await gridInstance.findPath());
         });
 
         randomizeButton.addEventListener('click', () => {
