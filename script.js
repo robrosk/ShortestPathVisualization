@@ -7,10 +7,12 @@ class Grid {
         this.grid = [];
         this.startCell = null;
         this.endCell = null;
-        // Cache DOM elements
         this.gridElement = document.getElementById('grid');
-        this.modeSelector = document.querySelector('input[name="mode"]:checked');
-        // Use DocumentFragment for better performance
+        
+        // Make grid responsive
+        this.gridElement.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
+        this.gridElement.style.gridTemplateRows = `repeat(${height}, 1fr)`;
+        
         this.initializeGrid();
         this.setupEventListeners();
     }
