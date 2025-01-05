@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Pathfinding</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <button id="clearGrid">Clear Grid</button>
+    <button id="findPath">Find Path</button>
+    <div class="container">
+        <div class="controls">
+            <div class="mode-selector">
+                <label>
+                    <input type="radio" name="mode" value="wall" checked> Place Wall
+                </label>
+                <label>
+                    <input type="radio" name="mode" value="start"> Place Start
+                </label>
+                <label>
+                    <input type="radio" name="mode" value="end"> Place End
+                </label>
+            </div>
+        </div>
+        <div id="grid"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 
