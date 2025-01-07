@@ -178,31 +178,42 @@ class Grid {
     }
 
     generateRandomMaze() {
-        // Clear the grid first
-        this.clearGrid();
+        let validMaze = false;
         
-        // Set random start point on left edge
-        const startRow = Math.floor(Math.random() * this.height);
-        this.startCell = this.grid[startRow][0];
-        this.startCell.className = 'cell start';
-        
-        // Set random end point on right edge
-        const endRow = Math.floor(Math.random() * this.height);
-        this.endCell = this.grid[endRow][this.width - 1];
-        this.endCell.className = 'cell end';
-        
-        // Initialize all cells as walls
-        for (let row = 0; row < this.height; row++) {
-            for (let col = 0; col < this.width; col++) {
-                if (this.grid[row][col] !== this.startCell && 
-                    this.grid[row][col] !== this.endCell) {
-                    this.grid[row][col].classList.add('wall');
+        while (!validMaze) {
+            // Clear the grid first
+            this.clearGrid();
+            
+            // Set random start point on left edge
+            const startRow = Math.floor(Math.random() * this.height);
+            this.startCell = this.grid[startRow][0];
+            this.startCell.className = 'cell start';
+            
+            // Set random end point on right edge
+            const endRow = Math.floor(Math.random() * this.height);
+            this.endCell = this.grid[endRow][this.width - 1];
+            this.endCell.className = 'cell end';
+            
+            // Initialize all cells as walls
+            for (let row = 0; row < this.height; row++) {
+                for (let col = 0; col < this.width; col++) {
+                    if (this.grid[row][col] !== this.startCell && 
+                        this.grid[row][col] !== this.endCell) {
+                        this.grid[row][col].classList.add('wall');
+                    }
                 }
             }
+            
+            // Generate maze using DFS
+            this.dfsMazeGeneration(startRow, 0);
+            
+            // Check if path exists between start and end
+            validMaze = this.hasValidPath();
+            
+            if (!validMaze) {
+                console.log('Generated maze has no valid path, regenerating...');
+            }
         }
-        
-        // Start DFS from the start cell
-        this.dfsMazeGeneration(startRow, 0);
     }
 
     dfsMazeGeneration(row, col) {
@@ -284,6 +295,201 @@ class Grid {
         }
         path.reverse()
         return path
+    }
+
+    async findPathAStar() {         
+        if (!this.startCell || !this.endCell) {
+            alert('Please set both start and end points');
+            return;
+        }
+        
+        // Clear any previous exploration visualization
+        const cells = this.gridElement.getElementsByClassName('exploring');
+        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        
+        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+        
+        console.log('Finding path from', [startRow, startCol], 'to', [endRow, endCol]);
+
+        const pq = new PriorityQueue();
+        const visited = new Set();
+        const f_score = {};
+        const g_score = {};
+
+        // Initialize all distances to Infinity
+        for (let row = 0; row < this.height; row++) {
+            for (let col = 0; col < this.width; col++) {
+                f_score[`${row},${col}`] = Infinity;
+                g_score[`${row},${col}`] = Infinity;
+            }
+        }
+
+        g_score[`${startRow},${startCol}`] = 0;
+        f_score[`${startRow},${startCol}`] = g_score[`${startRow},${startCol}`] + 
+            this.getManhattanDistance(startRow, startCol, endRow, endCol);
+
+        const came_from = {};
+        came_from[`${startRow},${startCol}`] = null;
+
+        pq.enqueue([startRow, startCol], f_score[`${startRow},${startCol}`]);
+
+        while(pq.values.length) {
+            const { element: current } = pq.dequeue();
+            const [currentRow, currentCol] = current;
+
+            // Visualize current cell being explored
+            if (this.grid[currentRow][currentCol] !== this.startCell && 
+                this.grid[currentRow][currentCol] !== this.endCell) {
+                this.grid[currentRow][currentCol].classList.add('exploring');
+                // Add small delay to see the exploration
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            visited.add(`${currentRow},${currentCol}`);
+            if (currentRow === endRow && currentCol === endCol) {
+                console.log('Path found!');
+                const path = this.reconstructPath(came_from, [endRow, endCol]);
+                return path;
+            }
+
+            const neighbors = this.getNeighbors(currentRow, currentCol);
+            for (const neighbor of neighbors) {
+                const [neighborRow, neighborCol] = neighbor;
+                if (visited.has(`${neighborRow},${neighborCol}`)) continue;
+
+                const tentative_g_score = g_score[`${currentRow},${currentCol}`] + 1;
+
+                if (tentative_g_score < g_score[`${neighborRow},${neighborCol}`]) {
+                    came_from[`${neighborRow},${neighborCol}`] = current;
+                    g_score[`${neighborRow},${neighborCol}`] = tentative_g_score;
+                    f_score[`${neighborRow},${neighborCol}`] = g_score[`${neighborRow},${neighborCol}`] + 
+                        this.getManhattanDistance(neighborRow, neighborCol, endRow, endCol);
+                    pq.enqueue([neighborRow, neighborCol], f_score[`${neighborRow},${neighborCol}`]);
+                }
+            }
+        }
+        return null;
+    }
+
+    async findPathDijkstra() {
+        if (!this.startCell || !this.endCell) {
+            alert('Please set both start and end points');
+            return;
+        }
+        
+        const cells = this.gridElement.getElementsByClassName('exploring');
+        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        
+        // Get start and end positions
+        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+
+        const dist = {};
+        const prev = {};
+        const pq = new PriorityQueue();
+        const visited = new Set();
+
+        // Initialize distances
+        for (let row = 0; row < this.height; row++) {
+            for (let col = 0; col < this.width; col++) {
+                if (!this.grid[row][col].classList.contains('wall')) {
+                    dist[`${row},${col}`] = Infinity;
+                    prev[`${row},${col}`] = null;
+                }
+            }
+        }
+
+        dist[`${startRow},${startCol}`] = 0;
+        pq.enqueue([startRow, startCol], 0);
+
+        while (!pq.isEmpty()) {
+            const { element: current } = pq.dequeue();
+            const [currentRow, currentCol] = current;
+
+            // Visualize current cell being explored
+            if (this.grid[currentRow][currentCol] !== this.startCell && 
+                this.grid[currentRow][currentCol] !== this.endCell) {
+                this.grid[currentRow][currentCol].classList.add('exploring');
+                // Add small delay to see the exploration
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            visited.add(`${currentRow},${currentCol}`);
+
+            if (currentRow === endRow && currentCol === endCol) {
+                console.log('Path found!');
+                const path = this.reconstructPath(prev, [endRow, endCol]);
+                return path;
+            }
+
+            const neighbors = this.getNeighbors(currentRow, currentCol);
+            for (const neighbor of neighbors) {
+                const [neighborRow, neighborCol] = neighbor;
+                if (visited.has(`${neighborRow},${neighborCol}`)) continue;
+
+                const tentative_dist = dist[`${currentRow},${currentCol}`] + 1;
+                if (tentative_dist < dist[`${neighborRow},${neighborCol}`]) {
+                    dist[`${neighborRow},${neighborCol}`] = tentative_dist;
+                    prev[`${neighborRow},${neighborCol}`] = current;
+                    pq.enqueue([neighborRow, neighborCol], tentative_dist);
+                }
+            }
+        }
+        return null;
+    }
+
+    async findPathBFS() {
+        if (!this.startCell || !this.endCell) {
+            alert('Please set both start and end points');
+            return;
+        }
+        
+        const cells = this.gridElement.getElementsByClassName('exploring');
+        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        
+        // TODO: Implement BFS
+        console.log('Implementing BFS...');
+    }
+
+    async findPathDFS() {
+        if (!this.startCell || !this.endCell) {
+            alert('Please set both start and end points');
+            return;
+        }
+        
+        const cells = this.gridElement.getElementsByClassName('exploring');
+        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        
+        // TODO: Implement DFS
+        console.log('Implementing DFS...');
+    }
+
+    // Helper method to check if a valid path exists
+    hasValidPath() {
+        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+        
+        const visited = new Set();
+        const queue = [[startRow, startCol]];
+        
+        while (queue.length > 0) {
+            const [row, col] = queue.shift();
+            const key = `${row},${col}`;
+            
+            if (row === endRow && col === endCol) {
+                return true;
+            }
+            
+            if (!visited.has(key)) {
+                visited.add(key);
+                
+                const neighbors = this.getNeighbors(row, col);
+                queue.push(...neighbors);
+            }
+        }
+        
+        return false;
     }
 }
 
@@ -374,15 +580,30 @@ document.addEventListener('DOMContentLoaded', () => {
         gridInstance = new Grid(20, 20);
         
         const clearButton = document.getElementById('clearGrid');
-        const findPathButton = document.getElementById('findPath');
+        const astarButton = document.getElementById('astar');
+        const dijkstraButton = document.getElementById('dijkstra');
+        const bfsButton = document.getElementById('bfs');
+        const dfsButton = document.getElementById('dfs');
         const randomizeButton = document.getElementById('randomize');
         
         clearButton.addEventListener('click', () => {
             requestAnimationFrame(() => gridInstance.clearGrid());
         });
 
-        findPathButton.addEventListener('click', () => {
-            requestAnimationFrame(async () => await gridInstance.findPath());
+        astarButton.addEventListener('click', () => {
+            requestAnimationFrame(async () => await gridInstance.findPathAStar());
+        });
+
+        dijkstraButton.addEventListener('click', () => {
+            requestAnimationFrame(async () => await gridInstance.findPathDijkstra());
+        });
+
+        bfsButton.addEventListener('click', () => {
+            requestAnimationFrame(async () => await gridInstance.findPathBFS());
+        });
+
+        dfsButton.addEventListener('click', () => {
+            requestAnimationFrame(async () => await gridInstance.findPathDFS());
         });
 
         randomizeButton.addEventListener('click', () => {

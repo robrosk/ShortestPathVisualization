@@ -36,10 +36,8 @@ body {
     font-weight: 600;
     transition: all 0.3s ease;
     flex: 1;
-    max-width: 180px;
+    max-width: 150px;
     font-size: clamp(0.9rem, 1.5vw, 1.1rem);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .button-container button:hover {
@@ -55,8 +53,17 @@ body {
 #clearGrid { background-color: #ff4757; }
 #clearGrid:hover { background-color: #ff6b81; }
 
-#findPath { background-color: #4834d4; }
-#findPath:hover { background-color: #686de0; }
+#astar { background-color: #4834d4; }
+#astar:hover { background-color: #686de0; }
+
+#dijkstra { background-color: #6c5ce7; }
+#dijkstra:hover { background-color: #a29bfe; }
+
+#bfs { background-color: #0984e3; }
+#bfs:hover { background-color: #74b9ff; }
+
+#dfs { background-color: #00b894; }
+#dfs:hover { background-color: #55efc4; }
 
 #randomize { background-color: #2ecc71; }
 #randomize:hover { background-color: #27ae60; }
