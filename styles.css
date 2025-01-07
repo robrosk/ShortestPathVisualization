@@ -149,6 +149,23 @@ body {
     100% { transform: scale(0.95); }
 }
 
+.cell.path {
+    background-color: #9b59b6;  /* Purple color */
+    animation: pathReveal 0.5s ease-out;
+    box-shadow: 0 0 10px rgba(155, 89, 182, 0.5);
+}
+
+@keyframes pathReveal {
+    from {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
 /* Mode selector styles */
 .mode-selector {
     margin-top: 10px;

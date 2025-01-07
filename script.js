@@ -293,8 +293,31 @@ class Grid {
             path.push(current);
             current = came_from[`${current[0]},${current[1]}`];
         }
-        path.reverse()
-        return path
+        
+        // Reverse path and visualize it
+        path.reverse();
+        
+        // Visualize the path
+        path.forEach(([row, col], index) => {
+            const cell = this.grid[row][col];
+            if (cell !== this.startCell && cell !== this.endCell) {
+                setTimeout(() => {
+                    cell.classList.remove('exploring');
+                    cell.classList.add('path');
+                }, index * 50); // Stagger the animation
+            }
+        });
+        
+        return path;
+    }
+
+    clearVisualization() {
+        // Get all cells with either class
+        const cells = this.gridElement.getElementsByClassName('cell');
+        Array.from(cells).forEach(cell => {
+            cell.classList.remove('exploring');
+            cell.classList.remove('path');
+        });
     }
 
     async findPathAStar() {         
@@ -303,9 +326,8 @@ class Grid {
             return;
         }
         
-        // Clear any previous exploration visualization
-        const cells = this.gridElement.getElementsByClassName('exploring');
-        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        // Clear ALL previous visualizations before starting
+        this.clearVisualization();
         
         const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
         const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
@@ -378,8 +400,8 @@ class Grid {
             return;
         }
         
-        const cells = this.gridElement.getElementsByClassName('exploring');
-        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        // Clear ALL previous visualizations before starting
+        this.clearVisualization();
         
         // Get start and end positions
         const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
@@ -417,12 +439,6 @@ class Grid {
 
             visited.add(`${currentRow},${currentCol}`);
 
-            if (currentRow === endRow && currentCol === endCol) {
-                console.log('Path found!');
-                const path = this.reconstructPath(prev, [endRow, endCol]);
-                return path;
-            }
-
             const neighbors = this.getNeighbors(currentRow, currentCol);
             for (const neighbor of neighbors) {
                 const [neighborRow, neighborCol] = neighbor;
@@ -436,6 +452,10 @@ class Grid {
                 }
             }
         }
+
+        const path = this.reconstructPath(prev, [endRow, endCol]);
+        if (path) return path;
+        
         return null;
     }
 
