@@ -289,24 +289,35 @@ class Grid {
         let current = end;
         const path = [];
         
-        while (current !== null) {
-            path.push(current);
-            current = came_from[`${current[0]},${current[1]}`];
+        // Check if end is reachable
+        if (!came_from[`${end[0]},${end[1]}`] && end !== this.startCell) {
+            console.log('No valid path exists');
+            return null;
         }
         
-        // Reverse path and visualize it
-        path.reverse();
-        
-        // Visualize the path
-        path.forEach(([row, col], index) => {
-            const cell = this.grid[row][col];
-            if (cell !== this.startCell && cell !== this.endCell) {
-                setTimeout(() => {
-                    cell.classList.remove('exploring');
-                    cell.classList.add('path');
-                }, index * 50); // Stagger the animation
+        while (current !== null) {
+            try {
+                path.unshift(current);
+                const key = `${current[0]},${current[1]}`;
+                current = came_from[key];
+            } catch (error) {
+                console.error('Error in path reconstruction:', error);
+                break;
             }
-        });
+        }
+        
+        // Only visualize if we have a valid path
+        if (path.length > 0) {
+            path.forEach(([row, col], index) => {
+                const cell = this.grid[row][col];
+                if (cell !== this.startCell && cell !== this.endCell) {
+                    setTimeout(() => {
+                        cell.classList.remove('exploring');
+                        cell.classList.add('path');
+                    }, index * 50); // Stagger the animation
+                }
+            });
+        }
         
         return path;
     }
@@ -455,7 +466,7 @@ class Grid {
 
         const path = this.reconstructPath(prev, [endRow, endCol]);
         if (path) return path;
-        
+
         return null;
     }
 
@@ -465,11 +476,51 @@ class Grid {
             return;
         }
         
-        const cells = this.gridElement.getElementsByClassName('exploring');
-        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        // Clear previous visualization
+        this.clearVisualization();
         
-        // TODO: Implement BFS
-        console.log('Implementing BFS...');
+        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+        
+        const queue = [[startRow, startCol]];
+        const visited = new Set();
+        const came_from = {};
+        came_from[`${startRow},${startCol}`] = null;
+        
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const [currentRow, currentCol] = current;
+            const currentKey = `${currentRow},${currentCol}`;
+            
+            if (visited.has(currentKey)) continue;
+            
+            visited.add(currentKey);
+            
+            // Visualize current cell being explored
+            if (this.grid[currentRow][currentCol] !== this.startCell && 
+                this.grid[currentRow][currentCol] !== this.endCell) {
+                this.grid[currentRow][currentCol].classList.add('exploring');
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            if (currentRow === endRow && currentCol === endCol) {
+                const path = this.reconstructPath(came_from, [endRow, endCol]);
+                return path;
+            }
+            
+            const neighbors = this.getNeighbors(currentRow, currentCol);
+            for (const neighbor of neighbors) {
+                const [neighborRow, neighborCol] = neighbor;
+                const neighborKey = `${neighborRow},${neighborCol}`;
+                
+                if (!visited.has(neighborKey)) {
+                    came_from[neighborKey] = current;
+                    queue.push(neighbor);
+                }
+            }
+        }
+        
+        return null;
     }
 
     async findPathDFS() {
@@ -478,11 +529,54 @@ class Grid {
             return;
         }
         
-        const cells = this.gridElement.getElementsByClassName('exploring');
-        Array.from(cells).forEach(cell => cell.classList.remove('exploring'));
+        // Clear previous visualization
+        this.clearVisualization();
         
-        // TODO: Implement DFS
-        console.log('Implementing DFS...');
+        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+        
+        const stack = [[startRow, startCol]];
+        const visited = new Set();
+        const came_from = {};
+        came_from[`${startRow},${startCol}`] = null;
+        
+        while (stack.length > 0) {
+            const current = stack.pop();
+            const [currentRow, currentCol] = current;
+            const key = `${currentRow},${currentCol}`;
+            
+            if (!visited.has(key)) {
+                visited.add(key);
+                
+                // Visualize current cell being explored
+                if (this.grid[currentRow][currentCol] !== this.startCell && 
+                    this.grid[currentRow][currentCol] !== this.endCell) {
+                    this.grid[currentRow][currentCol].classList.add('exploring');
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                
+                if (currentRow === endRow && currentCol === endCol) {
+                    const path = this.reconstructPath(came_from, [endRow, endCol]);
+                    return path;
+                }
+                
+                const neighbors = this.getNeighbors(currentRow, currentCol);
+                // Randomize neighbors for more interesting DFS paths
+                this.shuffleArray(neighbors);
+                
+                for (const neighbor of neighbors) {
+                    const [neighborRow, neighborCol] = neighbor;
+                    const neighborKey = `${neighborRow},${neighborCol}`;
+                    
+                    if (!visited.has(neighborKey)) {
+                        came_from[neighborKey] = current;
+                        stack.push(neighbor);
+                    }
+                }
+            }
+        }
+        
+        return null;
     }
 
     // Helper method to check if a valid path exists

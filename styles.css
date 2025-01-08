@@ -73,7 +73,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 100px 20px 40px;
+    padding: 120px 20px 40px;
     position: relative;
     min-height: 100vh;
     box-sizing: border-box;
@@ -88,6 +88,7 @@ body {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
     width: min(90%, 600px);
     transition: transform 0.3s ease;
+    margin-top: 60px;
 }
 
 .controls:hover {
@@ -168,11 +169,14 @@ body {
 
 /* Mode selector styles */
 .mode-selector {
-    margin-top: 10px;
     display: flex;
     gap: 15px;
     flex-wrap: wrap;
     justify-content: center;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
 .mode-selector label {
@@ -180,17 +184,19 @@ body {
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    padding: 10px 15px;
+    padding: 12px 20px;
     background-color: #f8f9fa;
     border-radius: 8px;
     transition: all 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     font-size: clamp(0.9rem, 1.5vw, 1rem);
+    font-weight: 500;
 }
 
 .mode-selector label:hover {
     background-color: #e9ecef;
     transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .mode-selector input[type="radio"] {
@@ -214,17 +220,20 @@ body {
 
     .mode-selector {
         flex-direction: column;
-        gap: 8px;
+        align-items: stretch;
     }
 
     .mode-selector label {
         width: 100%;
         justify-content: center;
-        padding: 12px;
     }
 
     .container {
-        padding-top: 160px;
+        padding-top: 180px;
+    }
+
+    .controls {
+        margin-top: 20px;
     }
 
     .cell:hover {
