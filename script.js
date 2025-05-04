@@ -13,6 +13,9 @@ class Grid {
         this.gridElement.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
         this.gridElement.style.gridTemplateRows = `repeat(${height}, 1fr)`;
         
+        this.abortController = null; // Add this to track and abort operations
+        this.isRunning = false; // Track if an algorithm is running
+        
         this.initializeGrid();
         this.setupEventListeners();
     }
@@ -90,9 +93,11 @@ class Grid {
     }
 
     clearGrid() {
-        // Use more efficient clearing method
+        // Cancel any ongoing operations first
+        this.abortAlgorithms();
+        
+        // Then clear the grid
         const cells = this.gridElement.getElementsByClassName('cell');
-        // Convert to array for faster iteration
         Array.from(cells).forEach(cell => cell.className = 'cell');
         this.startCell = null;
         this.endCell = null;
@@ -323,7 +328,6 @@ class Grid {
     }
 
     clearVisualization() {
-        // Get all cells with either class
         const cells = this.gridElement.getElementsByClassName('cell');
         Array.from(cells).forEach(cell => {
             cell.classList.remove('exploring');
@@ -331,252 +335,384 @@ class Grid {
         });
     }
 
-    async findPathAStar() {         
+    async findPathAStar() {
+        // Check if already running
+        if (this.isRunning) {
+            this.abortAlgorithms();
+            // Small delay before starting new operation
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
         if (!this.startCell || !this.endCell) {
             alert('Please set both start and end points');
             return;
         }
         
-        // Clear ALL previous visualizations before starting
+        // Set up abort controller for this operation
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        this.isRunning = true;
+        
         this.clearVisualization();
         
-        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
-        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
-        
-        console.log('Finding path from', [startRow, startCol], 'to', [endRow, endCol]);
+        try {
+            const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+            const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+            
+            console.log('Finding path from', [startRow, startCol], 'to', [endRow, endCol]);
 
-        const pq = new PriorityQueue();
-        const visited = new Set();
-        const f_score = {};
-        const g_score = {};
+            const pq = new PriorityQueue();
+            const visited = new Set();
+            const f_score = {};
+            const g_score = {};
 
-        // Initialize all distances to Infinity
+            // Initialize all distances to Infinity
         for (let row = 0; row < this.height; row++) {
             for (let col = 0; col < this.width; col++) {
-                f_score[`${row},${col}`] = Infinity;
-                g_score[`${row},${col}`] = Infinity;
-            }
-        }
-
-        g_score[`${startRow},${startCol}`] = 0;
-        f_score[`${startRow},${startCol}`] = g_score[`${startRow},${startCol}`] + 
-            this.getManhattanDistance(startRow, startCol, endRow, endCol);
-
-        const came_from = {};
-        came_from[`${startRow},${startCol}`] = null;
-
-        pq.enqueue([startRow, startCol], f_score[`${startRow},${startCol}`]);
-
-        while(pq.values.length) {
-            const { element: current } = pq.dequeue();
-            const [currentRow, currentCol] = current;
-
-            // Visualize current cell being explored
-            if (this.grid[currentRow][currentCol] !== this.startCell && 
-                this.grid[currentRow][currentCol] !== this.endCell) {
-                this.grid[currentRow][currentCol].classList.add('exploring');
-                // Add small delay to see the exploration
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-
-            visited.add(`${currentRow},${currentCol}`);
-            if (currentRow === endRow && currentCol === endCol) {
-                console.log('Path found!');
-                const path = this.reconstructPath(came_from, [endRow, endCol]);
-                return path;
-            }
-
-            const neighbors = this.getNeighbors(currentRow, currentCol);
-            for (const neighbor of neighbors) {
-                const [neighborRow, neighborCol] = neighbor;
-                if (visited.has(`${neighborRow},${neighborCol}`)) continue;
-
-                const tentative_g_score = g_score[`${currentRow},${currentCol}`] + 1;
-
-                if (tentative_g_score < g_score[`${neighborRow},${neighborCol}`]) {
-                    came_from[`${neighborRow},${neighborCol}`] = current;
-                    g_score[`${neighborRow},${neighborCol}`] = tentative_g_score;
-                    f_score[`${neighborRow},${neighborCol}`] = g_score[`${neighborRow},${neighborCol}`] + 
-                        this.getManhattanDistance(neighborRow, neighborCol, endRow, endCol);
-                    pq.enqueue([neighborRow, neighborCol], f_score[`${neighborRow},${neighborCol}`]);
+                    f_score[`${row},${col}`] = Infinity;
+                    g_score[`${row},${col}`] = Infinity;
                 }
             }
+
+            g_score[`${startRow},${startCol}`] = 0;
+            f_score[`${startRow},${startCol}`] = g_score[`${startRow},${startCol}`] + 
+                this.getManhattanDistance(startRow, startCol, endRow, endCol);
+
+            const came_from = {};
+            came_from[`${startRow},${startCol}`] = null;
+
+            pq.enqueue([startRow, startCol], f_score[`${startRow},${startCol}`]);
+
+        while(pq.values.length) {
+                if (signal.aborted) {
+                    console.log('A* search aborted');
+                    return null;
+                }
+                
+                const { element: current } = pq.dequeue();
+                const [currentRow, currentCol] = current;
+
+                // Visualize current cell being explored
+                if (this.grid[currentRow][currentCol] !== this.startCell && 
+                    this.grid[currentRow][currentCol] !== this.endCell) {
+                    this.grid[currentRow][currentCol].classList.add('exploring');
+                    // Check if aborted before waiting
+                    if (signal.aborted) {
+                        return null;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
+                visited.add(`${currentRow},${currentCol}`);
+                if (currentRow === endRow && currentCol === endCol) {
+                    console.log('Path found!');
+                    const path = this.reconstructPath(came_from, [endRow, endCol]);
+                    this.isRunning = false;
+                    return path;
+                }
+
+                const neighbors = this.getNeighbors(currentRow, currentCol);
+                for (const neighbor of neighbors) {
+                    const [neighborRow, neighborCol] = neighbor;
+                    if (visited.has(`${neighborRow},${neighborCol}`)) continue;
+
+                    const tentative_g_score = g_score[`${currentRow},${currentCol}`] + 1;
+
+                    if (tentative_g_score < g_score[`${neighborRow},${neighborCol}`]) {
+                        came_from[`${neighborRow},${neighborCol}`] = current;
+                        g_score[`${neighborRow},${neighborCol}`] = tentative_g_score;
+                        f_score[`${neighborRow},${neighborCol}`] = g_score[`${neighborRow},${neighborCol}`] + 
+                            this.getManhattanDistance(neighborRow, neighborCol, endRow, endCol);
+                        pq.enqueue([neighborRow, neighborCol], f_score[`${neighborRow},${neighborCol}`]);
+                    }
+                }
+            }
+            
+            this.isRunning = false;
+            return null;
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                console.log('A* search aborted');
+            } else {
+                console.error('Error in A* search:', e);
+            }
+            this.isRunning = false;
+            return null;
         }
-        return null;
     }
 
     async findPathDijkstra() {
+        // Check if already running
+        if (this.isRunning) {
+            this.abortAlgorithms();
+            // Small delay before starting new operation
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
         if (!this.startCell || !this.endCell) {
             alert('Please set both start and end points');
             return;
         }
         
-        // Clear ALL previous visualizations before starting
+        // Set up abort controller for this operation
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        this.isRunning = true;
+        
         this.clearVisualization();
         
-        // Get start and end positions
-        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
-        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+        try {
+            // Get start and end positions
+            const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+            const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
 
-        const dist = {};
-        const prev = {};
-        const pq = new PriorityQueue();
-        const visited = new Set();
+            const dist = {};
+            const prev = {};
+            const pq = new PriorityQueue();
+            const visited = new Set();
 
-        // Initialize distances
-        for (let row = 0; row < this.height; row++) {
-            for (let col = 0; col < this.width; col++) {
-                if (!this.grid[row][col].classList.contains('wall')) {
-                    dist[`${row},${col}`] = Infinity;
-                    prev[`${row},${col}`] = null;
+            // Initialize distances
+            for (let row = 0; row < this.height; row++) {
+                for (let col = 0; col < this.width; col++) {
+                    if (!this.grid[row][col].classList.contains('wall')) {
+                        dist[`${row},${col}`] = Infinity;
+                        prev[`${row},${col}`] = null;
+                    }
                 }
             }
-        }
 
-        dist[`${startRow},${startCol}`] = 0;
-        pq.enqueue([startRow, startCol], 0);
+            dist[`${startRow},${startCol}`] = 0;
+            pq.enqueue([startRow, startCol], 0);
 
-        while (!pq.isEmpty()) {
-            const { element: current } = pq.dequeue();
-            const [currentRow, currentCol] = current;
+            while (!pq.isEmpty()) {
+                if (signal.aborted) {
+                    console.log('Dijkstra search aborted');
+                    return null;
+                }
+                
+                const { element: current } = pq.dequeue();
+                const [currentRow, currentCol] = current;
 
-            // Visualize current cell being explored
-            if (this.grid[currentRow][currentCol] !== this.startCell && 
-                this.grid[currentRow][currentCol] !== this.endCell) {
-                this.grid[currentRow][currentCol].classList.add('exploring');
-                // Add small delay to see the exploration
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
+                // Visualize current cell being explored
+                if (this.grid[currentRow][currentCol] !== this.startCell && 
+                    this.grid[currentRow][currentCol] !== this.endCell) {
+                    this.grid[currentRow][currentCol].classList.add('exploring');
+                    // Check if aborted before waiting
+                    if (signal.aborted) {
+                        return null;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
 
-            visited.add(`${currentRow},${currentCol}`);
+                visited.add(`${currentRow},${currentCol}`);
+                
+                if (currentRow === endRow && currentCol === endCol) {
+                    console.log('Path found!');
+                    const path = this.reconstructPath(prev, [endRow, endCol]);
+                    this.isRunning = false;
+                    return path;
+                }
 
-            const neighbors = this.getNeighbors(currentRow, currentCol);
-            for (const neighbor of neighbors) {
-                const [neighborRow, neighborCol] = neighbor;
-                if (visited.has(`${neighborRow},${neighborCol}`)) continue;
+                const neighbors = this.getNeighbors(currentRow, currentCol);
+                for (const neighbor of neighbors) {
+                    const [neighborRow, neighborCol] = neighbor;
+                    if (visited.has(`${neighborRow},${neighborCol}`)) continue;
 
-                const tentative_dist = dist[`${currentRow},${currentCol}`] + 1;
-                if (tentative_dist < dist[`${neighborRow},${neighborCol}`]) {
-                    dist[`${neighborRow},${neighborCol}`] = tentative_dist;
-                    prev[`${neighborRow},${neighborCol}`] = current;
-                    pq.enqueue([neighborRow, neighborCol], tentative_dist);
+                    const tentative_dist = dist[`${currentRow},${currentCol}`] + 1;
+                    if (tentative_dist < dist[`${neighborRow},${neighborCol}`]) {
+                        dist[`${neighborRow},${neighborCol}`] = tentative_dist;
+                        prev[`${neighborRow},${neighborCol}`] = current;
+                        pq.enqueue([neighborRow, neighborCol], tentative_dist);
+                    }
                 }
             }
+            
+            this.isRunning = false;
+            return null;
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                console.log('Dijkstra search aborted');
+            } else {
+                console.error('Error in Dijkstra search:', e);
+            }
+            this.isRunning = false;
+            return null;
         }
-
-        const path = this.reconstructPath(prev, [endRow, endCol]);
-        if (path) return path;
-
-        return null;
     }
 
     async findPathBFS() {
+        // Check if already running
+        if (this.isRunning) {
+            this.abortAlgorithms();
+            // Small delay before starting new operation
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
         if (!this.startCell || !this.endCell) {
             alert('Please set both start and end points');
             return;
         }
         
-        // Clear previous visualization
+        // Set up abort controller for this operation
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        this.isRunning = true;
+        
         this.clearVisualization();
         
-        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
-        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
-        
-        const queue = [[startRow, startCol]];
-        const visited = new Set();
-        const came_from = {};
-        came_from[`${startRow},${startCol}`] = null;
-        
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const [currentRow, currentCol] = current;
-            const currentKey = `${currentRow},${currentCol}`;
+        try {
+            const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+            const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
             
-            if (visited.has(currentKey)) continue;
+            const queue = [[startRow, startCol]];
+            const visited = new Set();
+            const came_from = {};
+            came_from[`${startRow},${startCol}`] = null;
             
-            visited.add(currentKey);
-            
-            // Visualize current cell being explored
-            if (this.grid[currentRow][currentCol] !== this.startCell && 
-                this.grid[currentRow][currentCol] !== this.endCell) {
-                this.grid[currentRow][currentCol].classList.add('exploring');
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            
-            if (currentRow === endRow && currentCol === endCol) {
-                const path = this.reconstructPath(came_from, [endRow, endCol]);
-                return path;
-            }
-            
-            const neighbors = this.getNeighbors(currentRow, currentCol);
-            for (const neighbor of neighbors) {
-                const [neighborRow, neighborCol] = neighbor;
-                const neighborKey = `${neighborRow},${neighborCol}`;
-                
-                if (!visited.has(neighborKey)) {
-                    came_from[neighborKey] = current;
-                    queue.push(neighbor);
+            while (queue.length > 0) {
+                if (signal.aborted) {
+                    console.log('BFS search aborted');
+                    return null;
                 }
-            }
-        }
-        
-        return null;
-    }
-
-    async findPathDFS() {
-        if (!this.startCell || !this.endCell) {
-            alert('Please set both start and end points');
-            return;
-        }
-        
-        // Clear previous visualization
-        this.clearVisualization();
-        
-        const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
-        const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
-        
-        const stack = [[startRow, startCol]];
-        const visited = new Set();
-        const came_from = {};
-        came_from[`${startRow},${startCol}`] = null;
-        
-        while (stack.length > 0) {
-            const current = stack.pop();
-            const [currentRow, currentCol] = current;
-            const key = `${currentRow},${currentCol}`;
-            
-            if (!visited.has(key)) {
-                visited.add(key);
+                
+                const current = queue.shift();
+                const [currentRow, currentCol] = current;
+                const currentKey = `${currentRow},${currentCol}`;
+                
+                if (visited.has(currentKey)) continue;
+                
+                visited.add(currentKey);
                 
                 // Visualize current cell being explored
                 if (this.grid[currentRow][currentCol] !== this.startCell && 
                     this.grid[currentRow][currentCol] !== this.endCell) {
                     this.grid[currentRow][currentCol].classList.add('exploring');
+                    // Check if aborted before waiting
+                    if (signal.aborted) {
+                        return null;
+                    }
                     await new Promise(resolve => setTimeout(resolve, 50));
                 }
                 
                 if (currentRow === endRow && currentCol === endCol) {
+                    console.log('Path found!');
                     const path = this.reconstructPath(came_from, [endRow, endCol]);
+                    this.isRunning = false;
                     return path;
                 }
                 
                 const neighbors = this.getNeighbors(currentRow, currentCol);
-                // Randomize neighbors for more interesting DFS paths
-                this.shuffleArray(neighbors);
-                
                 for (const neighbor of neighbors) {
                     const [neighborRow, neighborCol] = neighbor;
                     const neighborKey = `${neighborRow},${neighborCol}`;
                     
                     if (!visited.has(neighborKey)) {
                         came_from[neighborKey] = current;
-                        stack.push(neighbor);
+                        queue.push(neighbor);
                     }
                 }
             }
+            
+            this.isRunning = false;
+            return null;
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                console.log('BFS search aborted');
+            } else {
+                console.error('Error in BFS search:', e);
+            }
+            this.isRunning = false;
+            return null;
+        }
+    }
+
+    async findPathDFS() {
+        // Check if already running
+        if (this.isRunning) {
+            this.abortAlgorithms();
+            // Small delay before starting new operation
+            await new Promise(resolve => setTimeout(resolve, 50));
         }
         
-        return null;
+        if (!this.startCell || !this.endCell) {
+            alert('Please set both start and end points');
+            return;
+        }
+        
+        // Set up abort controller for this operation
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        this.isRunning = true;
+        
+        this.clearVisualization();
+        
+        try {
+            const [startRow, startCol] = this.startCell.dataset.pos.split(',').map(Number);
+            const [endRow, endCol] = this.endCell.dataset.pos.split(',').map(Number);
+            
+            const stack = [[startRow, startCol]];
+            const visited = new Set();
+            const came_from = {};
+            came_from[`${startRow},${startCol}`] = null;
+            
+            while (stack.length > 0) {
+                if (signal.aborted) {
+                    console.log('DFS search aborted');
+                    return null;
+                }
+                
+                const current = stack.pop();
+                const [currentRow, currentCol] = current;
+                const key = `${currentRow},${currentCol}`;
+                
+                if (!visited.has(key)) {
+                    visited.add(key);
+                    
+                    // Visualize current cell being explored
+                    if (this.grid[currentRow][currentCol] !== this.startCell && 
+                        this.grid[currentRow][currentCol] !== this.endCell) {
+                        this.grid[currentRow][currentCol].classList.add('exploring');
+                        // Check if aborted before waiting
+                        if (signal.aborted) {
+                            return null;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                    
+                    if (currentRow === endRow && currentCol === endCol) {
+                        console.log('Path found!');
+                        const path = this.reconstructPath(came_from, [endRow, endCol]);
+                        this.isRunning = false;
+                        return path;
+                    }
+                    
+                    const neighbors = this.getNeighbors(currentRow, currentCol);
+                    // Randomize neighbors for more interesting DFS paths
+                    this.shuffleArray(neighbors);
+                    
+                    for (const neighbor of neighbors) {
+                        const [neighborRow, neighborCol] = neighbor;
+                        const neighborKey = `${neighborRow},${neighborCol}`;
+                        
+                        if (!visited.has(neighborKey)) {
+                            came_from[neighborKey] = current;
+                            stack.push(neighbor);
+                        }
+                    }
+                }
+            }
+            
+            this.isRunning = false;
+            return null;
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                console.log('DFS search aborted');
+            } else {
+                console.error('Error in DFS search:', e);
+            }
+            this.isRunning = false;
+            return null;
+        }
     }
 
     // Helper method to check if a valid path exists
@@ -604,6 +740,16 @@ class Grid {
         }
         
         return false;
+    }
+
+    // Add this new method to abort running algorithms
+    abortAlgorithms() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+        this.isRunning = false;
+        this.clearVisualization();
     }
 }
 
@@ -701,23 +847,75 @@ document.addEventListener('DOMContentLoaded', () => {
         const randomizeButton = document.getElementById('randomize');
         
         clearButton.addEventListener('click', () => {
-            requestAnimationFrame(() => gridInstance.clearGrid());
+            // First immediately abort any running algorithm
+            if (gridInstance.isRunning) {
+                gridInstance.abortAlgorithms();
+            }
+            
+            // Then schedule the grid clearing for the next animation frame
+            requestAnimationFrame(() => {
+                // Make sure we clear all visual elements
+                const cells = gridInstance.gridElement.getElementsByClassName('cell');
+                Array.from(cells).forEach(cell => {
+                    cell.className = 'cell';
+                });
+                
+                // Clear start/end points references
+                gridInstance.startCell = null;
+                gridInstance.endCell = null;
+            });
         });
 
         astarButton.addEventListener('click', () => {
-            requestAnimationFrame(async () => await gridInstance.findPathAStar());
+            // Cancel any running algorithm first
+            if (gridInstance.isRunning) {
+                gridInstance.abortAlgorithms();
+                // Small delay before starting new operation
+                setTimeout(() => {
+                    requestAnimationFrame(async () => await gridInstance.findPathAStar());
+                }, 50);
+            } else {
+                requestAnimationFrame(async () => await gridInstance.findPathAStar());
+            }
         });
 
         dijkstraButton.addEventListener('click', () => {
-            requestAnimationFrame(async () => await gridInstance.findPathDijkstra());
+            // Cancel any running algorithm first
+            if (gridInstance.isRunning) {
+                gridInstance.abortAlgorithms();
+                // Small delay before starting new operation
+                setTimeout(() => {
+                    requestAnimationFrame(async () => await gridInstance.findPathDijkstra());
+                }, 50);
+            } else {
+                requestAnimationFrame(async () => await gridInstance.findPathDijkstra());
+            }
         });
 
         bfsButton.addEventListener('click', () => {
-            requestAnimationFrame(async () => await gridInstance.findPathBFS());
+            // Cancel any running algorithm first
+            if (gridInstance.isRunning) {
+                gridInstance.abortAlgorithms();
+                // Small delay before starting new operation
+                setTimeout(() => {
+                    requestAnimationFrame(async () => await gridInstance.findPathBFS());
+                }, 50);
+            } else {
+                requestAnimationFrame(async () => await gridInstance.findPathBFS());
+            }
         });
 
         dfsButton.addEventListener('click', () => {
-            requestAnimationFrame(async () => await gridInstance.findPathDFS());
+            // Cancel any running algorithm first
+            if (gridInstance.isRunning) {
+                gridInstance.abortAlgorithms();
+                // Small delay before starting new operation
+                setTimeout(() => {
+                    requestAnimationFrame(async () => await gridInstance.findPathDFS());
+                }, 50);
+            } else {
+                requestAnimationFrame(async () => await gridInstance.findPathDFS());
+            }
         });
 
         randomizeButton.addEventListener('click', () => {
