@@ -8,36 +8,42 @@ body {
     overflow-x: hidden;
 }
 
-/* Button container styles */
+/* Button container styles - improve mobile layout */
 .button-container {
     position: fixed;
-    top: 20px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 15px;
+    flex-wrap: wrap;
+    gap: 8px;
     z-index: 1000;
-    width: min(90%, 800px);
+    width: min(95%, 800px);
     justify-content: center;
-    padding: 10px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
-    border-radius: 15px;
+    border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* Button styles */
+/* Button styles - better sizing for small screens */
 .button-container button {
-    padding: 12px 24px;
+    padding: 10px 12px;
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 600;
     transition: all 0.3s ease;
-    flex: 1;
-    max-width: 150px;
-    font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+    flex: 1 1 auto;
+    min-width: 60px;
+    max-width: 120px;
+    font-size: clamp(0.7rem, 3vw, 1rem);
+    text-align: center;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .button-container button:hover {
@@ -68,27 +74,30 @@ body {
 #randomize { background-color: #2ecc71; }
 #randomize:hover { background-color: #27ae60; }
 
-/* Container styles */
+/* Container styles - better top padding for mobile */
 .container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 120px 20px 40px;
+    padding-top: 140px; /* Increased to account for wrapped buttons */
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 20px;
     position: relative;
     min-height: 100vh;
     box-sizing: border-box;
-    gap: 25px;
+    gap: 15px;
 }
 
 /* Controls styles */
 .controls {
     background: white;
-    padding: 20px;
+    padding: 15px;
     border-radius: 15px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-    width: min(90%, 600px);
+    width: min(90%, 500px);
     transition: transform 0.3s ease;
-    margin-top: 60px;
+    margin-top: 20px;
 }
 
 .controls:hover {
@@ -103,7 +112,7 @@ body {
     padding: 15px;
     border-radius: 15px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-    width: min(90%, 600px);
+    width: min(90%, 500px);
     aspect-ratio: 1;
     transition: transform 0.3s ease;
 }
@@ -167,16 +176,17 @@ body {
     }
 }
 
-/* Mode selector styles */
+/* Mode selector improvement for small screens */
 .mode-selector {
     display: flex;
-    gap: 15px;
+    gap: 8px;
     flex-wrap: wrap;
     justify-content: center;
-    padding: 15px;
+    padding: 10px;
     background: rgba(255, 255, 255, 0.9);
-    border-radius: 12px;
+    border-radius: 10px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    width: 100%;
 }
 
 .mode-selector label {
@@ -204,64 +214,114 @@ body {
     accent-color: #4834d4;
 }
 
-/* Responsive design */
+/* Better responsive adjustments */
 @media (max-width: 768px) {
     .button-container {
-        flex-direction: row;
         flex-wrap: wrap;
-        gap: 10px;
-        padding: 8px;
+        padding: 6px;
+        gap: 6px;
     }
 
     .button-container button {
-        padding: 10px 15px;
-        font-size: clamp(0.8rem, 3vw, 0.9rem);
-    }
-
-    .mode-selector {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .mode-selector label {
-        width: 100%;
-        justify-content: center;
+        flex: 1 1 calc(33.333% - 8px);
+        max-width: none;
+        padding: 8px 4px;
+        font-size: 0.8rem;
     }
 
     .container {
-        padding-top: 180px;
+        padding-top: 160px;
+        gap: 10px;
     }
-
-    .controls {
-        margin-top: 20px;
-    }
-
-    .cell:hover {
-        transform: none;
+    
+    #grid {
+        width: min(95%, 450px);
     }
 }
 
 @media (max-width: 480px) {
     .button-container {
-        width: 95%;
-        top: 10px;
+        top: 5px;
+        width: 98%;
+    }
+
+    .button-container button {
+        flex: 1 1 calc(50% - 4px);
+        font-size: 0.75rem;
+        padding: 8px 2px;
     }
 
     .container {
-        padding: 140px 10px 20px;
+        padding-top: 180px;
+        padding-left: 0;
+        padding-right: 0;
     }
 
     .controls {
-        padding: 15px;
+        width: 95%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 10px;
     }
 
     #grid {
-        padding: 10px;
+        width: 95%;
+        padding: 3px;
+        gap: 1px;
+        border-radius: 10px;
+        margin: 0 auto;
     }
+    
+    .cell {
+        border-radius: 0;
+        border-width: 0;
+    }
+}
 
+/* For very narrow screens */
+@media (max-width: 400px) {
+    #grid {
+        padding: 2px;
+        gap: 0.5px;
+    }
+    
+    .controls {
+        padding: 8px;
+    }
+    
     .mode-selector label {
-        padding: 10px;
-        font-size: 0.9rem;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Ultra-small screens */
+@media (max-width: 350px) {
+    .button-container button {
+        font-size: 0.65rem;
+        padding: 6px 2px;
+    }
+    
+    .container {
+        padding-top: 170px;
+    }
+    
+    #grid {
+        padding: 1px;
+        gap: 0.5px;
+    }
+    
+    .cell.exploring {
+        animation: none;
+    }
+    
+    .cell.path {
+        animation: none;
+        box-shadow: none;
+    }
+    
+    .cell.start, .cell.end {
+        box-shadow: none;
     }
 }
 
